@@ -1,47 +1,53 @@
-# --- utilities ---------------------------------------------------------------
-# Extract repository name from git remote URL
-function _opr_extract_repo() {
-  local url=$1
-  case "$url" in
-    git@github.com:*)   echo "${url#git@github.com:}" | sed 's/\.git$//' ;;
-    https://github.com/*) echo "${url#https://github.com/}" | sed 's/\.git$//' ;;
-    *) return 1 ;;
-  esac
+# Function to insert text into command line
+function _insert_command() {
+    LBUFFER="$1"
+    zle redisplay
 }
 
-# --- hook functions ----------------------------------------------------------
-# Store the last executed command
-function _opr_preexec() {
-  _OPR_LAST_CMD=("${(z)1}")   # Split into array
-  _OPR_PIDS=$!
-}
+# Create widget to insert text into command line
+zle -N _insert_command_widget _insert_command
 
-# Called after command execution (before prompt display)
-function _opr_precmd() {
-  # Check if the last command was successful
-  if [[ $? -ne 0 ]]; then return; fi
+# Variables to store the last command output
+typeset -g _last_git_output=""
+typeset -g _last_pr_url=""
 
-  # Check if the last command was `git push` or `git ps`
-  if [[ ${_OPR_LAST_CMD[1]} == "git" && (${_OPR_LAST_CMD[2]} == "push" || ${_OPR_LAST_CMD[2]} == "ps") ]]; then
-    local branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) || return
-    local remote_url=$(git config --get remote.origin.url) || return
-    local repo=$(_opr_extract_repo "$remote_url") || return
-    local pr_url="https://github.com/${repo}/pull/new/${branch}"
-
-    # Open browser
-    if command -v open >/dev/null; then
-      (open "$pr_url" &>| /dev/null &)
-    elif command -v xdg-open >/dev/null; then
-      (xdg-open "$pr_url" &>| /dev/null &)
+# Function to detect GitHub pull request URL
+function _detect_pr_url() {
+    local output="$1"
+    # Detect both new PR creation URL and existing PR URL
+    local pr_url=$(echo "$output" | grep -o 'https://github.com/[^/]*/[^/]*/pull/\(new/[^ ]*\|[0-9]*\)' | head -n 1)
+    if [[ -n "$pr_url" ]]; then
+        _last_pr_url="$pr_url"
     fi
-    echo "[open-pr] 🚀  $pr_url"
-  fi
 }
 
-# --- activate hooks ----------------------------------------------------------
-autoload -Uz add-zsh-hook
-add-zsh-hook preexec _opr_preexec
-add-zsh-hook precmd  _opr_precmd
+# Hook for git push and git ps commands
+function _git_push_hook() {
+    # Execute command and save output
+    _last_git_output=$(command git "$@" 2>&1)
+    _detect_pr_url "$_last_git_output"
+    echo "$_last_git_output"
+}
 
-# --- aliases ----------------------------------------------------------------
-alias ps='git push' 
+# Override git push and git ps commands
+function git() {
+    if [[ "$1" == "push" ]] || [[ "$1" == "ps" ]]; then
+        _git_push_hook "$@"
+    else
+        command git "$@"
+    fi
+}
+
+# Function executed before prompt display
+function _precmd_hook() {
+    if [[ -n "$_last_pr_url" ]]; then
+        # Display open command in command line
+        print -z "open $_last_pr_url"
+        # Clear the variable
+        _last_pr_url=""
+    fi
+}
+
+# Add precmd hook
+autoload -Uz add-zsh-hook
+add-zsh-hook precmd _precmd_hook

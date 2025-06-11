@@ -1,12 +1,12 @@
 # zsh-open-pr
 
-A zsh plugin that automatically opens GitHub Pull Request creation page in your browser after `git push` or `git ps` command.
+A zsh plugin that suggests the `open` command to open GitHub Pull Request creation page after `git push` or `git ps` command.
 
 ## Features
 
-- Automatically opens GitHub PR creation page after `git push` or `git ps`
-- Supports both SSH and HTTPS GitHub repository URLs
-- Works on macOS (using `open` command) and Linux (using `xdg-open` command)
+- Suggests the `open` command to open GitHub PR creation page after `git push` or `git ps`
+- Supports both new PR creation URLs and existing PR URLs
+- Works on macOS (using `open` command)
 - Provides `ps` alias for `git push`
 
 ## Installation
@@ -47,18 +47,24 @@ source /path/to/zsh-open-pr/zsh-open-pr.plugin.zsh
 
 ## Usage
 
-Simply use `git push` or `git ps` as you normally would. After a successful push, the plugin will automatically:
+Simply use `git push` or `git ps` as you normally would. After a successful push, the plugin will:
 
-1. Extract the current branch name
-2. Get the repository URL
-3. Open your default browser to the PR creation page
-4. Display the PR URL in the terminal
+1. Detect the GitHub Pull Request URL from the command output
+2. Suggest the `open` command in your next command line
+3. You can press Enter to execute the suggested command or modify it as needed
+
+Example:
+```bash
+$ git push -u origin HEAD
+# After successful push, the next command line will show:
+$ open https://github.com/username/repo/pull/new/branch-name
+```
 
 ## Requirements
 
 - zsh
 - git
-- macOS (`open` command) or Linux (`xdg-open` command)
+- macOS (`open` command)
 
 ## License
 
